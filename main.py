@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from models.entry_model import LearningEntry
 from datetime import datetime
+from typing import Optional
 
 app = FastAPI()
 
@@ -28,6 +29,19 @@ dummy_entries = [
 
 
 @app.get("/entries")
-def get_entries():
-    #登録されている全ての学習ノートを取得する
-    return [entry.model_dump() for entry in dummy_entries]
+def get_entries(tag: Optional[str] = None):#/entries?tag 型ヒント:str/none　ここでクエリパラメータがなくてもよくしている
+    """
+    登録されている全ての学習ノートを取得する．
+    tag クエリパラメータが指定されていれば，そのタグを含むノートだけ返す．
+    """
+    # tag が指定されていない場合：全件返す
+    if tag is None:
+        return [entry.model_dump() for entry in dummy_entries] #[式 for 変数 in リスト (if 条件)]
+
+    # tag が指定されている場合：タグでフィルタ
+    filtered = [
+        entry
+        for entry in dummy_entries
+        if tag in entry.tags  # tags に指定された tag が含まれているかどうか
+    ]
+    return [entry.model_dump() for entry in filtered]
