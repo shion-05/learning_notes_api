@@ -123,3 +123,9 @@ def update_entry(entry_id: int, payload: EntryCreate):
 
     # 見つからなかったとき
     raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
+
+#検索機能の文字列一致確認
+def _contains(text: Optional[str], needle: str) -> bool:
+    if text is None:
+        return False
+    return needle.lower() in text.lower()
