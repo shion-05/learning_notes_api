@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from models.entry_model import LearningEntry, EntryCreate
 from datetime import datetime
 from typing import Optional,List
@@ -71,3 +71,17 @@ def create_entry(payload: EntryCreate):
 
     # 作成したノートをそのまま返す
     return entry.model_dump()
+
+@app.get("/entries/{entry_id}")
+def get_entry(entry_id: int):
+    """
+    指定されたIDの学習ノートを1件だけ返す
+    見つからなければ 404 を返す
+    """
+    # entries の中から id が一致するものを探す
+    for entry in entries:
+        if entry.id == entry_id:
+            return entry.model_dump()
+
+    # ループを全部見ても見つからなかった場合
+    raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
