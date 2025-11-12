@@ -54,11 +54,11 @@ def create_entry(payload: EntryCreate):
     """
     新しい学習ノートを追加する
     """
-    # 新しいIDを決める（簡易的に「現在の件数 + 1」を採用）
+    # 新しいIDを決める
     new_id = len(entries) + 1
     now = datetime.now()
 
-    # EntryCreate から LearningEntry を組み立てる
+    # EntryCreate から LearningEntry を作成
     entry = LearningEntry(
         id=new_id,
         created_at=now,
@@ -85,3 +85,20 @@ def get_entry(entry_id: int):
 
     # ループを全部見ても見つからなかった場合
     raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
+
+@app.delete("/entries/{entry_id}")
+def delete_entry(entry_id: int):
+    """
+    指定されたIDの学習ノートを削除するAPI
+    削除したノートの内容を返す
+    見つからなければ 404 を返す
+    """
+    for index, entry in enumerate(entries):
+        if entry.id == entry_id:
+            # 見つかった位置から要素を削除し，削除したものを取得
+            deleted = entries.pop(index)
+            return deleted.model_dump()
+
+    # 見つからなかった場合
+    raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
+
