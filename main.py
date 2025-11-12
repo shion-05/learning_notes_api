@@ -102,3 +102,24 @@ def delete_entry(entry_id: int):
     # 見つからなかった場合
     raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
 
+@app.put("/entries/{entry_id}")
+def update_entry(entry_id: int, payload: EntryCreate):
+    """
+    指定IDの学習ノートを更新する（PUT）
+    - id と created_at は保持
+    - updated_at は現在時刻に更新
+    - 404: 見つからないとき
+    - 422: 必須項目が欠けているとき（Pydanticが判定）
+    """
+    for idx, existing in enumerate(entries):
+        if existing.id == entry_id:
+            # Pydantic v2 の model_copy(update=...) で上書き
+            updated = existing.model_copy(update={ #.model_copyで内容のコピー 引数にupdate=を付けるとフィールドの上書きが可能
+                **payload.model_dump(),     # term / short_description / detail / tags / sourceを更新,**は辞書の展開
+                "updated_at": datetime.now()
+            })
+            entries[idx] = updated
+            return updated.model_dump()
+
+    # 見つからなかったとき
+    raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
