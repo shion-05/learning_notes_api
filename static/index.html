@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>Learning Notes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: sans-serif; margin: 16px; }
+    #tags button { margin: 4px; }
+    .entry { border: 1px solid #ddd; padding: 8px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>Learning Notes</h1>
+
+  <section>
+    <input id="keyword" placeholder="キーワード検索（例: api / 勾配）" />
+    <button id="searchBtn">検索</button>
+  </section>
+
+  <section>
+    <h3>タグ</h3>
+    <div id="tags"></div>
+  </section>
+
+  <section>
+    <h3>新規追加</h3>
+    <form id="createForm">
+      <div><input name="term" placeholder="用語・トピック名" required /></div>
+      <div><input name="short_description" placeholder="短い説明" required /></div>
+      <div><textarea name="detail" placeholder="詳細（任意）"></textarea></div>
+      <div><input name="tags" placeholder="タグ（カンマ区切り） 例: AI,Python" /></div>
+      <div><input name="source" placeholder="出典URLなど（任意）" /></div>
+      <button type="submit">追加</button>
+    </form>
+  </section>
+
+  <section>
+    <h3>一覧</h3>
+    <div id="entries"></div>
+  </section>
+
+  <script>
+    const API = ""; // 同一オリジンで配信するので空でOK（/entries 等にそのまま届く）
+
+    async function fetchJSON(path) {
+      const res = await fetch(API + path);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    function renderEntries(items) {
+      const box = document.getElementById("entries");
+      box.innerHTML = "";
+      if (!items.length) {
+        box.textContent = "データなし";
+        return;
+      }
+      for (const e of items) {
+        const div = document.createElement("div");
+        div.className = "entry";
+        div.innerHTML = `
+          <div><b>${e.term}</b></div>
+          <div>${e.short_description}</div>
+          <div style="color:#666; font-size: 12px;">${(e.tags||[]).join(", ")}</div>
+        `;
+        box.appendChild(div);
+      }
+    }
+
+    async function loadTags() {
+      const tags = await fetchJSON("/tags");
+      const box = document.getElementById("tags");
+      box.innerHTML = "";
+      for (const t of tags) {
+        const btn = document.createElement("button");
+        btn.textContent = `${t.name} (${t.count})`;
+        btn.onclick = async () => {
+          const items = await fetchJSON(`/entries?tag=${encodeURIComponent(t.name)}`);
+          renderEntries(items);
+        };
+        box.appendChild(btn);
+      }
+    }
+
+    async function loadAll() {
+      await loadTags();
+      const items = await fetchJSON("/entries");
+      renderEntries(items);
+    }
+
+    document.getElementById("searchBtn").onclick = async () => {
+      const kw = document.getElementById("keyword").value.trim();
+      if (!kw) { renderEntries(await fetchJSON("/entries")); return; }
+      const items = await fetchJSON(`/entries/search?keyword=${encodeURIComponent(kw)}`);
+      renderEntries(items);
+    };
+
+    document.getElementById("createForm").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      const payload = {
+        term: fd.get("term"),
+        short_description: fd.get("short_description"),
+        detail: fd.get("detail") || null,
+        tags: (fd.get("tags") || "").split(",").map(s => s.trim()).filter(Boolean),
+        source: fd.get("source") || null
+      };
+      const res = await fetch("/entries", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) { alert(await res.text()); return; }
+      ev.target.reset();
+      await loadAll();
+    };
+
+    loadAll();
+  </script>
+</body>
+</html>

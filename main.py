@@ -2,8 +2,11 @@ from fastapi import FastAPI, HTTPException
 from models.entry_model import LearningEntry, EntryCreate
 from datetime import datetime
 from typing import Optional,List
+from collections import Counter
 
 app = FastAPI()
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 実際のアプリの「簡易データベース」的なものとして使うリスト
 entries: List[LearningEntry] = []
@@ -48,6 +51,12 @@ def get_entries(tag: Optional[str] = None):#/entries?tag 型ヒント:str/none�
         if tag in entry.tags  # tags に指定された tag が含まれているかどうか
     ]
     return [entry.model_dump() for entry in filtered]
+
+#検索機能の文字列一致確認
+def _contains(text: Optional[str], needle: str) -> bool:
+    if text is None:
+        return False
+    return needle.lower() in text.lower()
 
 @app.get("/entries/search")
 def search_entries(keyword: Optional[str] = None, tag: Optional[str] = None):
@@ -156,8 +165,13 @@ def update_entry(entry_id: int, payload: EntryCreate):
     # 見つからなかったとき
     raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
 
-#検索機能の文字列一致確認
-def _contains(text: Optional[str], needle: str) -> bool:
-    if text is None:
-        return False
-    return needle.lower() in text.lower()
+#タグ一覧表示
+@app.get("/tags")
+def list_tags():
+    counter = Counter()
+    for e in entries:
+        for t in (e.tags or []):
+            counter[t] += 1
+    # 件数の多い順に並べて返す
+    return [{"name": name, "count": count} for name, count in counter.most_common()]
+
