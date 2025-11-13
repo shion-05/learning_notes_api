@@ -49,6 +49,38 @@ def get_entries(tag: Optional[str] = None):#/entries?tag 型ヒント:str/none�
     ]
     return [entry.model_dump() for entry in filtered]
 
+@app.get("/entries/search")
+def search_entries(keyword: Optional[str] = None, tag: Optional[str] = None):
+    """
+    ノート検索する
+    - keyword: term / short_description / detail に部分一致（大文字小文字無視）
+    - tag: tags に完全一致
+    どちらか片方だけでもOK。両方指定時は AND 条件。
+    """
+    # 条件が何もないときは空配列を返す（無制限で全件返さない方針）
+    if keyword is None and tag is None:
+        return []
+
+    result = []
+    for entry in entries:
+        ok_keyword = True  # デフォルト通過
+        ok_tag = True      # デフォルト通過
+
+        if keyword is not None:
+            ok_keyword = (
+                _contains(entry.term, keyword) or
+                _contains(entry.short_description, keyword) or
+                _contains(entry.detail, keyword)
+            )
+
+        if tag is not None:
+            ok_tag = (tag in (entry.tags or []))
+
+        if ok_keyword and ok_tag:
+            result.append(entry.model_dump())
+
+    return result
+
 @app.post("/entries")
 def create_entry(payload: EntryCreate):
     """
@@ -72,7 +104,7 @@ def create_entry(payload: EntryCreate):
     # 作成したノートをそのまま返す
     return entry.model_dump()
 
-@app.get("/entries/{entry_id}")
+@app.get("/entries/{entry_id:int}")
 def get_entry(entry_id: int):
     """
     指定されたIDの学習ノートを1件だけ返す
@@ -86,7 +118,7 @@ def get_entry(entry_id: int):
     # ループを全部見ても見つからなかった場合
     raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
 
-@app.delete("/entries/{entry_id}")
+@app.delete("/entries/{entry_id:int}")
 def delete_entry(entry_id: int):
     """
     指定されたIDの学習ノートを削除するAPI
@@ -102,7 +134,7 @@ def delete_entry(entry_id: int):
     # 見つからなかった場合
     raise HTTPException(status_code=404, detail=f"Entry with id={entry_id} not found")
 
-@app.put("/entries/{entry_id}")
+@app.put("/entries/{entry_id:int}")
 def update_entry(entry_id: int, payload: EntryCreate):
     """
     指定IDの学習ノートを更新する（PUT）
