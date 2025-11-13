@@ -7,22 +7,25 @@
   <style>
     body { font-family: sans-serif; margin: 16px; }
     #tags button { margin: 4px; }
-    .entry { border: 1px solid #ddd; padding: 8px; margin: 8px 0; }
+    .entry { border: 1px solid #ddd; padding: 8px; margin: 8px 0; border-radius: 6px; }
   </style>
 </head>
 <body>
   <h1>Learning Notes</h1>
 
+  <!--検索バー -->
   <section>
-    <input id="keyword" placeholder="キーワード検索（例: api / 勾配）" />
+    <input id="keyword" placeholder="キーワード検索（例: FastAPI / 機械学習）" />
     <button id="searchBtn">検索</button>
   </section>
 
+  <!--タグ一覧 -->
   <section>
     <h3>タグ</h3>
     <div id="tags"></div>
   </section>
 
+  <!--新規追加フォーム -->
   <section>
     <h3>新規追加</h3>
     <form id="createForm">
@@ -35,39 +38,75 @@
     </form>
   </section>
 
+  <!-- 一覧表示エリア -->
   <section>
     <h3>一覧</h3>
     <div id="entries"></div>
   </section>
 
   <script>
-    const API = ""; // 同一オリジンで配信するので空でOK（/entries 等にそのまま届く）
+    //APIのベースURL（同じFastAPIサーバー内なら空文字でOK）
+    const API = "";
 
+    // 共通のJSON取得関数（fetchのラッパー）
     async function fetchJSON(path) {
       const res = await fetch(API + path);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     }
 
+    //ノート一覧の描画
     function renderEntries(items) {
       const box = document.getElementById("entries");
-      box.innerHTML = "";
+      box.innerHTML = ""; // 一度リセット
       if (!items.length) {
         box.textContent = "データなし";
         return;
       }
+
       for (const e of items) {
         const div = document.createElement("div");
         div.className = "entry";
+
+        // ノートカードのHTML構成（タイトル・説明・タグ・削除ボタン）
         div.innerHTML = `
-          <div><b>${e.term}</b></div>
-          <div>${e.short_description}</div>
-          <div style="color:#666; font-size: 12px;">${(e.tags||[]).join(", ")}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <b>${e.term}</b><br>
+              <span>${e.short_description}</span><br>
+              <small style="color:#666;">${(e.tags || []).join(", ")}</small>
+            </div>
+            <!-- 🗑 削除ボタン -->
+            <button data-id="${e.id}" class="deleteBtn"
+              style="background:#ff5555; color:white; border:none; border-radius:6px; padding:4px 8px; cursor:pointer;">
+              削除
+            </button>
+          </div>
         `;
+
+        // ボタンのクリックイベント設定
+        const btn = div.querySelector(".deleteBtn");
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          if (!confirm(`ID ${id} のノートを削除しますか？`)) return;
+
+          // DELETEメソッドでAPI呼び出し
+          const res = await fetch(`/entries/${id}`, { method: "DELETE" });
+          if (!res.ok) {
+            alert("削除に失敗しました");
+            console.error(await res.text());
+            return;
+          }
+
+          // 削除後に一覧を再読み込み
+          await loadAll();
+        });
+
         box.appendChild(div);
       }
     }
 
+    //タグ一覧の読み込み
     async function loadTags() {
       const tags = await fetchJSON("/tags");
       const box = document.getElementById("tags");
@@ -83,21 +122,27 @@
       }
     }
 
+    //一覧＋タグをまとめて再読み込み
     async function loadAll() {
       await loadTags();
       const items = await fetchJSON("/entries");
       renderEntries(items);
     }
 
+    //検索ボタンの処理
     document.getElementById("searchBtn").onclick = async () => {
       const kw = document.getElementById("keyword").value.trim();
-      if (!kw) { renderEntries(await fetchJSON("/entries")); return; }
+      if (!kw) {
+        renderEntries(await fetchJSON("/entries"));
+        return;
+      }
       const items = await fetchJSON(`/entries/search?keyword=${encodeURIComponent(kw)}`);
       renderEntries(items);
     };
 
+    // ➕ 新規追加フォームの送信処理
     document.getElementById("createForm").onsubmit = async (ev) => {
-      ev.preventDefault();
+      ev.preventDefault(); // ページリロードを防止
       const fd = new FormData(ev.target);
       const payload = {
         term: fd.get("term"),
@@ -106,16 +151,23 @@
         tags: (fd.get("tags") || "").split(",").map(s => s.trim()).filter(Boolean),
         source: fd.get("source") || null
       };
+
       const res = await fetch("/entries", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) { alert(await res.text()); return; }
-      ev.target.reset();
-      await loadAll();
+
+      if (!res.ok) {
+        alert(await res.text());
+        return;
+      }
+
+      ev.target.reset(); // 入力フォームをクリア
+      await loadAll();   // 一覧とタグを更新
     };
 
+    //ページ初期読み込み時に一覧とタグを取得
     loadAll();
   </script>
 </body>
